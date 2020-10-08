@@ -75,16 +75,16 @@ class limitreport {
 
     async.each(
       _.range(this.max_loops),
-      function(i, callback_p) {
-        _self.sqs.receiveMessage(queueParams, function(err, rcv_payload) {
+      function (i, callback_p) {
+        _self.sqs.receiveMessage(queueParams, function (err, rcv_payload) {
           if (err) {
             LOGGER.log('ERROR', err); //🔥
             callback_p();
           } else if (rcv_payload.Messages && rcv_payload.Messages.length > 0) {
             async.each(
               rcv_payload.Messages,
-              function(message, callback_e) {
-                _self.updateTable(message, function(err, data) {
+              function (message, callback_e) {
+                _self.updateTable(message, function (err, data) {
                   if (err) {
                     LOGGER.log('ERROR', JSON.stringify(err));
                     callback_e();
@@ -94,18 +94,18 @@ class limitreport {
                     //calling sendMetrics and removeMessage in parallel
                     async.parallel(
                       {
-                        remove_mssg: function(callback) {
-                          _self.removeMessage(message, function(data) {
+                        remove_mssg: function (callback) {
+                          _self.removeMessage(message, function (data) {
                             callback(null, data);
                           });
                         },
-                        send_metric: function(callback) {
-                          _self.sendMetrics(message, function(data) {
+                        send_metric: function (callback) {
+                          _self.sendMetrics(message, function (data) {
                             callback(null, data);
                           });
                         },
                       },
-                      function(err, results) {
+                      function (err, results) {
                         // results
                         LOGGER.log(
                           'INFO',
@@ -117,7 +117,7 @@ class limitreport {
                   }
                 });
               },
-              function(err) {
+              function (err) {
                 if (
                   err //if any iteration callback called with error
                 );
@@ -129,7 +129,7 @@ class limitreport {
           } //no messages
         });
       },
-      function(err) {
+      function (err) {
         return cb(null, {
           Result: 'TA messages read',
         });
@@ -157,12 +157,12 @@ class limitreport {
         CurrentUsage: ta_mssg.detail['check-item-detail']['Current Usage'],
         LimitAmount: ta_mssg.detail['check-item-detail']['Limit Amount'],
         Status: ta_mssg.detail['status'],
-        ExpiryTime: new Date().getTime() + 15 * 24 * 3600 * 1000, //1️⃣5️⃣ days
+        ExpiryTime: parseInt((new Date().getTime() + 15 * 24 * 3600 * 1000) / 1000), //1️⃣5️⃣ days
       },
     };
     LOGGER.log('DEBUG', `DDB put item: ${JSON.stringify(params)}`);
 
-    this.docClient.put(params, function(err, data) {
+    this.docClient.put(params, function (err, data) {
       if (err) {
         return cb(
           {
@@ -217,7 +217,7 @@ class limitreport {
       `anonymous metric: ${JSON.stringify(_anonymousmetric)}`
     );
 
-    _metricsHelper.sendAnonymousMetric(_anonymousmetric, function(err, data) {
+    _metricsHelper.sendAnonymousMetric(_anonymousmetric, function (err, data) {
       let responseData;
       if (err) {
         responseData = {
@@ -245,7 +245,7 @@ class limitreport {
       ReceiptHandle: message.ReceiptHandle,
     };
 
-    this.sqs.deleteMessage(_deleteParams, function(err, data) {
+    this.sqs.deleteMessage(_deleteParams, function (err, data) {
       if (err) {
         return cb({
           Status: {

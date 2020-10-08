@@ -18,7 +18,7 @@
 
 'use strict';
 
-const uuidv4 = require('uuid/v4');
+const { "v4": uuidv4 } = require('uuid');
 const https = require('https');
 const url = require('url');
 const moment = require('moment');
@@ -28,7 +28,7 @@ const AWS = require('aws-sdk');
 const LOGGER = new (require('./logger'))();
 const MetricsHelper = require('./metrics-helper');
 
-const respond = function(event, context, callback) {
+const respond = function (event, context, callback) {
   //handle CREATE for custom resource CreateUUID
   if (
     event.LogicalResourceId === 'CreateUUID' &&
@@ -71,7 +71,7 @@ const respond = function(event, context, callback) {
     const slackHookKey = event.ResourceProperties.SLACK_HOOK_KEY;
     const slackChannelKey = event.ResourceProperties.SLACK_CHANNEL_KEY;
 
-    createSSMParameter(slackChannelKey, slackHookKey, function(data) {
+    createSSMParameter(slackChannelKey, slackHookKey, function (data) {
       LOGGER.log('INFO', `SSM Status: ${JSON.stringify(data)}`);
       sendResponse(
         event,
@@ -98,7 +98,7 @@ const respond = function(event, context, callback) {
       AnonymousData: event.ResourceProperties.ANONYMOUS_DATA,
     };
     //call metric helper
-    sendMetrics(_metricData, event, function(data) {
+    sendMetrics(_metricData, event, function (data) {
       LOGGER.log('INFO', `Metrics Status: ${JSON.stringify(data)}`);
       let _responseData = {
         Method: `${event.LogicalResourceId}:${event.RequestType}`,
@@ -138,7 +138,7 @@ const respond = function(event, context, callback) {
       TARefreshRate: event.ResourceProperties.TA_REFRESH_RATE,
     };
     //call metric helper
-    sendMetrics(_metricData, event, function(data) {
+    sendMetrics(_metricData, event, function (data) {
       LOGGER.log('INFO', `Metrics Status: ${JSON.stringify(data)}`);
       let _responseData = {
         Method: `${event.LogicalResourceId}:${event.RequestType}`,
@@ -166,7 +166,7 @@ const respond = function(event, context, callback) {
     let awsAccounts = event.ResourceProperties.SUB_ACCOUNTS.replace(/"/g, '');
     let _awsAccounts = awsAccounts.split(',');
 
-    createTrust(_awsAccounts, function(data) {
+    createTrust(_awsAccounts, function (data) {
       LOGGER.log('INFO', data);
       let _responseData = {
         Method: `${event.LogicalResourceId}:${event.RequestType}`,
@@ -200,10 +200,10 @@ const respond = function(event, context, callback) {
     let _newAccounts = newAccounts.split(',');
 
     //remove trust first
-    removeTrust(_oldAccounts, function(data) {
+    removeTrust(_oldAccounts, function (data) {
       LOGGER.log('INFO', data);
       //now establish trust for updated account list
-      createTrust(_newAccounts, function(data) {
+      createTrust(_newAccounts, function (data) {
         LOGGER.log('INFO', data);
         let _responseData = {
           Method: `${event.LogicalResourceId}:${event.RequestType}`,
@@ -232,7 +232,7 @@ const respond = function(event, context, callback) {
     let awsAccounts = event.ResourceProperties.SUB_ACCOUNTS.replace(/"/g, '');
     let _awsAccounts = awsAccounts.split(',');
 
-    removeTrust(_awsAccounts, function(data) {
+    removeTrust(_awsAccounts, function (data) {
       LOGGER.log('INFO', data);
       let _responseData = {
         Method: `${event.LogicalResourceId}:${event.RequestType}`,
@@ -273,7 +273,7 @@ const respond = function(event, context, callback) {
  * [sendMetrics description]
  * @type {[type]}
  */
-let sendMetrics = function(metricData, event, cb) {
+let sendMetrics = function (metricData, event, cb) {
   let _metricsHelper = new MetricsHelper();
 
   let _metric = {
@@ -287,7 +287,7 @@ let sendMetrics = function(metricData, event, cb) {
 
   LOGGER.log('DEBUG', `anonymous metric: ${JSON.stringify(_metric)}`);
 
-  _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
+  _metricsHelper.sendAnonymousMetric(_metric, function (err, data) {
     let responseData;
     if (err) {
       responseData = {
@@ -306,7 +306,7 @@ let sendMetrics = function(metricData, event, cb) {
 /**
  * Sends a response to the pre-signed S3 URL
  */
-let sendResponse = function(
+let sendResponse = function (
   event,
   callback,
   logStreamName,
@@ -356,7 +356,7 @@ let sendResponse = function(
  */
 
 // 03/13/2019 - SO-Limit-M-45 - Fix to concurrent put permission call
-const createTrust = async function(accounts, cb) {
+const createTrust = async function (accounts, cb) {
   const CWE = new AWS.CloudWatchEvents();
   if (accounts[0])
     LOGGER.log(
@@ -373,7 +373,7 @@ const createTrust = async function(accounts, cb) {
       StatementId: `limtr-${account}`,
     })
       .promise()
-      .then(function(r) {
+      .then(function (r) {
         LOGGER.log(
           'DEBUG',
           `${JSON.stringify(
@@ -389,7 +389,7 @@ const createTrust = async function(accounts, cb) {
           )}`
         );
       })
-      .catch(function(err) {
+      .catch(function (err) {
         LOGGER.log(
           'ERROR',
           `${JSON.stringify(
@@ -412,7 +412,7 @@ const createTrust = async function(accounts, cb) {
 /**
  * Removes trust relationship for cross accounts
  */
-const removeTrust = async function(accounts, cb) {
+const removeTrust = async function (accounts, cb) {
   let CWE = new AWS.CloudWatchEvents();
   if (accounts[0])
     LOGGER.log(
@@ -427,7 +427,7 @@ const removeTrust = async function(accounts, cb) {
       StatementId: `limtr-${account}`,
     })
       .promise()
-      .then(function(r) {
+      .then(function (r) {
         LOGGER.log(
           'DEBUG',
           `${JSON.stringify(
@@ -443,7 +443,7 @@ const removeTrust = async function(accounts, cb) {
           )}`
         ); // successful response 👌
       })
-      .catch(function(err) {
+      .catch(function (err) {
         LOGGER.log(
           'ERROR',
           `${JSON.stringify(
@@ -470,7 +470,7 @@ async function createSSMParameter(channelKey, hookURLKey, cb) {
   const ssm = new AWS.SSM();
   try {
     const data = await ssm
-      .getParameters({Names: [channelKey, hookURLKey], WithDecryption: true})
+      .getParameters({ Names: [channelKey, hookURLKey], WithDecryption: true })
       .promise();
     LOGGER.log(
       'DEBUG',
