@@ -170,10 +170,6 @@ Resources:
       Handler: index.handler
       Role: !Sub ${TARefresherRole.Arn}
       Code:
-<<<<<<< HEAD
-        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"],Ref: "AWS::Region"]]
-        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],"limtr-refresh-service.zip"]]
-=======
         S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
@@ -183,7 +179,6 @@ Resources:
               "limtr-refresh-service.zip",
             ],
           ]
->>>>>>> local copy
       Runtime: nodejs12.x
       Timeout: 300
 
@@ -249,10 +244,6 @@ Resources:
         Variables:
           LOG_LEVEL: "INFO" #change to WARN, ERROR or DEBUG as needed
       Code:
-<<<<<<< HEAD
-        S3Bucket: !Join ["-",[!FindInMap ["SourceCode", "General", "S3Bucket"],Ref: "AWS::Region"]]
-        S3Key: !Join ["/",[!FindInMap ["SourceCode", "General", "KeyPrefix"],"limtr-helper-service.zip"]]
-=======
         S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
@@ -262,7 +253,6 @@ Resources:
               "limtr-helper-service.zip",
             ],
           ]
->>>>>>> local copy
       Runtime: nodejs12.x
       Timeout: 300
       Description: This function generates UUID, establishes cross account trust on CloudWatch Event Bus and sends anonymous metric
