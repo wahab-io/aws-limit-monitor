@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 
 Description: (SO0005) - The AWS CloudFormation template for deployment of the %%SOLUTION_NAME%%. Version %%VERSION%% - Spoke Template for vCPU limits
 
@@ -27,11 +27,18 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
+          LOG_LEVEL: "INFO" #change to WARN, ERROR or DEBUG as needed
           LIMIT_THRESHOLD: !Ref ThresholdPercentage
       Code:
-        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
-        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "service-quotas-checks-service.zip"]]
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
+        S3Key:
+          !Join [
+            "/",
+            [
+              !FindInMap ["SourceCode", "General", "KeyPrefix"],
+              "service-quotas-checks-service.zip",
+            ],
+          ]
       Runtime: nodejs12.x
       Timeout: 300
       Description: This function checks for vCPU limits and sends notifiction on WARN and ERROR status
@@ -42,37 +49,37 @@ Resources:
     Metadata:
       cfn_nag:
         rules_to_suppress:
-        - id: W11
-          reason: The actions servicequotas:GetServiceQuota, cloudwatch:GetMTricData, events:PutEvents REQUIRE * resource.
+          - id: W11
+            reason: The actions servicequotas:GetServiceQuota, cloudwatch:GetMTricData, events:PutEvents REQUIRE * resource.
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
-        - Effect: Allow
-          Principal:
-            Service: lambda.amazonaws.com
-          Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
       Path: /
       Policies:
-      - PolicyName: Limit_Monitor_Policy
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-          - Effect: Allow
-            Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-          - Effect: Allow
-            Action:
-              - servicequotas:GetServiceQuota
-              - servicequotas:GetAWSDefaultServiceQuota
-              - servicequotas:ListServiceQuotas
-              - cloudwatch:GetMetricData
-              - events:PutEvents
-              - ec2:DescribeRegions
-            Resource: "*"
+        - PolicyName: Limit_Monitor_Policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action:
+                  - servicequotas:GetServiceQuota
+                  - servicequotas:GetAWSDefaultServiceQuota
+                  - servicequotas:ListServiceQuotas
+                  - cloudwatch:GetMetricData
+                  - events:PutEvents
+                  - ec2:DescribeRegions
+                Resource: "*"
 
   LimitCheckSchedule:
     Type: AWS::Events::Rule

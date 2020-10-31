@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.8
+    commands:
+      - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3
+      - export PATH="$HOME/.poetry/bin:$PATH"
+  build:
+    commands:
+      - cd deployment
+      - ./build-s3-dist.sh $ARTIFACTS_BUCKET aws-limit-monitor v5.3.2 $ARTIFACTS_BUCKET
+      - cd ../customization/
+      - ./build-customization.sh
+      - cd ..
+  post_build:
+    commands:
+      - ls -la
+      - mkdir -p aws-limit-monitor/v5.3.2
+      - cp deployment/global-s3-assets/*.template aws-limit-monitor/v5.3.2
+      - cp deployment/regional-s3-assets/*.zip aws-limit-monitor/v5.3.2
+      - cp customization/dist/newrelic-datasync-service.zip aws-limit-monitor/v5.3.2
+artifacts:
+  files:
+    - "aws-limit-monitor/**/*"

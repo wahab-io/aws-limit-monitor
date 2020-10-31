@@ -286,14 +286,7 @@ Resources:
       Handler: index.handler
       Role: !Sub ${LimitSummarizerRole.Arn}
       Code:
-        S3Bucket:
-          !Join [
-            "-",
-            [
-              !FindInMap ["SourceCode", "General", "S3Bucket"],
-              Ref: "AWS::Region",
-            ],
-          ]
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
             "/",
@@ -369,6 +362,8 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 2
         WriteCapacityUnits: 2
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       Tags:
         - Key: Solution
           Value: Serverless-Limit-Monitor
@@ -393,14 +388,7 @@ Resources:
       Handler: index.handler
       Role: !Sub ${SlackNotifierRole.Arn}
       Code:
-        S3Bucket:
-          !Join [
-            "-",
-            [
-              !FindInMap ["SourceCode", "General", "S3Bucket"],
-              Ref: "AWS::Region",
-            ],
-          ]
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
             "/",
@@ -541,14 +529,7 @@ Resources:
       Handler: index.handler
       Role: !Sub ${TARefresherRole.Arn}
       Code:
-        S3Bucket:
-          !Join [
-            "-",
-            [
-              !FindInMap ["SourceCode", "General", "S3Bucket"],
-              Ref: "AWS::Region",
-            ],
-          ]
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
             "/",
@@ -621,14 +602,7 @@ Resources:
         Variables:
           LOG_LEVEL: "INFO" #change to WARN, ERROR or DEBUG as needed
       Code:
-        S3Bucket:
-          !Join [
-            "-",
-            [
-              !FindInMap ["SourceCode", "General", "S3Bucket"],
-              Ref: "AWS::Region",
-            ],
-          ]
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         S3Key:
           !Join [
             "/",
@@ -728,6 +702,87 @@ Resources:
         - "https://s3.amazonaws.com/${S3Bucket}/${KeyPrefix}/service-quotas-checks.template"
         - S3Bucket: !FindInMap ["SourceCode", "General", "TemplateBucket"]
           KeyPrefix: !FindInMap ["SourceCode", "General", "KeyPrefix"]
+
+  DynamoDBEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      EventSourceArn: !GetAtt SummaryDDB.StreamArn
+      FunctionName: !GetAtt NewRelicDataSync.Arn
+      StartingPosition: LATEST
+      Enabled: true
+
+  NewRelicDataSyncRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: "Limit-Monitor-NewRelicDataSync-ExecutionRole-Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "lambda:InvokeFunction"
+                Resource: "*"
+
+              - Effect: "Allow"
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+
+              - Effect: "Allow"
+                Action:
+                  - dynamodb:DescribeStream
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:ListStreams
+                Resource: "*"
+
+              - Effect: "Allow"
+                Action: "secretsmanager:GetSecretValue"
+                Resource: "arn:aws:secretsmanager:us-west-2:415596832415:secret:development/infrastructure/kanan-deployment-marker-dev*"
+
+              - Effect: "Allow"
+                Action:
+                  - organizations:List*
+                  - organizations:Describe*
+                Resource: "*"
+
+  NewRelicDataSync:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: This function pushes data from DynamoDB to Lambda Function
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt NewRelicDataSyncRole.Arn
+      Runtime: python3.8
+      Timeout: 300
+      Environment:
+        Variables:
+          AWS_SECRETS_KEY_NAME: newrelic/keys
+          AWS_SECRET_REGION: us-east-1
+          NEW_RELIC_API_ENDPOINT: https://insights-collector.newrelic.com/v1/accounts/<new-relic-account>/events
+          NEW_RELIC_APP_NAME: LimitMonitoring
+          LOG_LEVEL: INFO
+      Code:
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
+        S3Key:
+          !Join [
+            "/",
+            [
+              !FindInMap ["SourceCode", "General", "KeyPrefix"],
+              "newrelic-datasync-service.zip",
+            ],
+          ]
 
 Outputs:
   ServiceChecks:

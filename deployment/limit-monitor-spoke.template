@@ -41,7 +41,10 @@ Mappings:
       KeyPrefix: "%%SOLUTION_NAME%%/%%VERSION%%"
       TemplateBucket: %%TEMPLATE_BUCKET_NAME%%
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> local copy
   EventsMap:
     Checks:
       Services: '"AutoScaling","CloudFormation","DynamoDB","EBS","EC2","ELB","IAM","Kinesis","RDS","Route53","SES","VPC"' #change if needed
@@ -167,8 +170,20 @@ Resources:
       Handler: index.handler
       Role: !Sub ${TARefresherRole.Arn}
       Code:
+<<<<<<< HEAD
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"],Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],"limtr-refresh-service.zip"]]
+=======
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
+        S3Key:
+          !Join [
+            "/",
+            [
+              !FindInMap ["SourceCode", "General", "KeyPrefix"],
+              "limtr-refresh-service.zip",
+            ],
+          ]
+>>>>>>> local copy
       Runtime: nodejs12.x
       Timeout: 300
 
@@ -234,8 +249,20 @@ Resources:
         Variables:
           LOG_LEVEL: "INFO" #change to WARN, ERROR or DEBUG as needed
       Code:
+<<<<<<< HEAD
         S3Bucket: !Join ["-",[!FindInMap ["SourceCode", "General", "S3Bucket"],Ref: "AWS::Region"]]
         S3Key: !Join ["/",[!FindInMap ["SourceCode", "General", "KeyPrefix"],"limtr-helper-service.zip"]]
+=======
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
+        S3Key:
+          !Join [
+            "/",
+            [
+              !FindInMap ["SourceCode", "General", "KeyPrefix"],
+              "limtr-helper-service.zip",
+            ],
+          ]
+>>>>>>> local copy
       Runtime: nodejs12.x
       Timeout: 300
       Description: This function generates UUID, establishes cross account trust on CloudWatch Event Bus and sends anonymous metric
@@ -285,13 +312,11 @@ Resources:
 
   limitCheckStack:
     Type: AWS::CloudFormation::Stack
-    Properties: 
-      TemplateURL: !Sub 
-        - 'https://s3.amazonaws.com/${S3Bucket}/${KeyPrefix}/service-quotas-checks.template' 
-        -  
-          S3Bucket: !FindInMap ["SourceCode", "General", "TemplateBucket"] 
-          KeyPrefix: !FindInMap ["SourceCode", "General", "KeyPrefix"] 
-
+    Properties:
+      TemplateURL: !Sub
+        - "https://s3.amazonaws.com/${S3Bucket}/${KeyPrefix}/service-quotas-checks.template"
+        - S3Bucket: !FindInMap ["SourceCode", "General", "TemplateBucket"]
+          KeyPrefix: !FindInMap ["SourceCode", "General", "KeyPrefix"]
 
 Outputs:
   ServiceChecks:

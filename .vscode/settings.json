@@ -1,0 +1,6 @@
+{
+    "python.pythonPath": "${workspaceFolder}/customization/.venv/bin/python",
+    "python.autoComplete.extraPaths": [
+        "customization"
+    ]
+}
