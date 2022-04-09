@@ -1,0 +1,223 @@
+# Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with
+# the License. A copy of the License is located at
+#     http://aws.amazon.com/apache2.0/
+# or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and
+# limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: CodeCommit, CodeBuild, CodeDeploy and CodePipeline setup for AWS Solution Deployment
+
+Parameters:
+  ProjectName:
+    Description: Project Name
+    Type: String
+  ProjectNameLower:
+    Description: Project Name (Lower)
+    Type: String
+  ArtifactsBucket:
+    Description: Bucket Name to store Artifacts
+    Type: String
+  SharedKeyARN:
+    Description: ARN of the Shared Key in KMS used for encrypting artifacts
+    Type: String
+  NonProdAccount:
+    Description: Account Number of Non-Production Account
+    Type: String
+  ProdAccount:
+    Description: Account Number of Production Account
+    Type: String
+
+Resources:
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject*
+            Resource: !Join ["", ["arn:aws:s3:::", !Ref ArtifactsBucket, "/*"]]
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - !Sub arn:aws:iam::${NonProdAccount}:root
+                - !Sub arn:aws:iam::${ProdAccount}:root
+  Repository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryDescription: !Ref ProjectName
+      RepositoryName: !Ref ProjectNameLower
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-CodeBuildRole"
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-CodeBuildPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub arn:aws:s3:::${ArtifactsBucket}/*
+              - Effect: "Allow"
+                Action:
+                  - kms:GenerateDataKey*
+                  - kms:DescribeKey
+                  - kms:Encrypt
+                  - kms:ReEncrypt*
+                  - kms:Decrypt
+                Resource: !Ref SharedKeyARN
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectNameLower
+      Description: !Ref ProjectName
+      EncryptionKey: !Ref SharedKeyARN
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactsBucket
+        NamespaceType: BUILD_ID
+        Path: Builds
+        Name: artifacts.zip
+        Packaging: ZIP
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        EnvironmentVariables:
+          - Value: !Ref ArtifactsBucket
+            Name: ARTIFACTS_BUCKET
+      Source:
+        Type: CODECOMMIT
+        Location: !GetAtt Repository.CloneUrlHttp
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-CodePipelineRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+      Path: /
+  CodePipelineRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-CodePipelineRolePolicy"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - "*"
+          - Effect: Allow
+            Action:
+              - codecommit:*
+            Resource: !GetAtt Repository.Arn
+          - Effect: Allow
+            Action:
+              - codebuild:*
+            Resource: !GetAtt CodeBuildProject.Arn
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - !Sub arn:aws:s3:::${ArtifactsBucket}
+              - !Sub arn:aws:s3:::${ArtifactsBucket}/*
+          - Effect: Allow
+            Action:
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:Decrypt
+            Resource: !Ref SharedKeyARN
+      Roles:
+        - !Ref CodePipelineRole
+  CodePipeline:
+    DependsOn: CodePipelineRolePolicy
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${ProjectNameLower}-pipeline"
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactsBucket
+        EncryptionKey:
+          Id: !Ref SharedKeyARN
+          Type: KMS
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GetSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: "1"
+              Configuration:
+                RepositoryName: !Sub ${ProjectNameLower}
+                BranchName: master
+              OutputArtifacts:
+                - Name: SourceArtifacts
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: BuildSolution
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceArtifacts
+              OutputArtifacts:
+                - Name: BuildArtifacts
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: DeploySolution
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: "1"
+              Configuration:
+                BucketName: !Ref ArtifactsBucket
+                Extract: true
+              InputArtifacts:
+                - Name: BuildArtifacts
+              RunOrder: 1
